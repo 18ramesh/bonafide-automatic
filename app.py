@@ -13,15 +13,15 @@ EXCEL_FILE = "students.xlsx"
 
 
 # --------------------------------------------------
-# Initialize database
+# Initialize database and import Excel data
 # --------------------------------------------------
 
 def initialize_database():
 
     conn = sqlite3.connect(DB_NAME)
-
     cursor = conn.cursor()
 
+    # Create students table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS students (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -36,18 +36,34 @@ def initialize_database():
 
     conn.commit()
 
-    # Check whether students already exist
+    # Check existing students
     cursor.execute("SELECT COUNT(*) FROM students")
     count = cursor.fetchone()[0]
 
-    # Import Excel data only if database is empty
-    if count == 0 and os.path.exists(EXCEL_FILE):
+    print(f"Database before Excel import: {count} students")
 
-        df = pd.read_excel(EXCEL_FILE)
+    # Import Excel when database is empty
+    if count == 0:
 
-        for _, row in df.iterrows():
+        if not os.path.exists(EXCEL_FILE):
 
-            try:
+            print("ERROR: students.xlsx NOT FOUND")
+            print("Current directory:", os.getcwd())
+
+            conn.close()
+            return
+
+        try:
+
+            print("Found students.xlsx")
+            print("Reading Excel file...")
+
+            df = pd.read_excel(EXCEL_FILE)
+
+            print("Excel columns:", list(df.columns))
+            print("Excel rows:", len(df))
+
+            for _, row in df.iterrows():
 
                 cursor.execute("""
                     INSERT OR IGNORE INTO students
@@ -55,20 +71,23 @@ def initialize_database():
                     VALUES (?, ?, ?, ?, ?, ?)
                 """, (
                     str(row["USN"]).strip().upper(),
-                    str(row["Name"]),
-                    str(row["Course"]),
-                    str(row["Department"]),
-                    str(row["Semester"]),
-                    str(row["Academic Year"])
+                    str(row["Name"]).strip(),
+                    str(row["Course"]).strip(),
+                    str(row["Department"]).strip(),
+                    str(row["Semester"]).strip(),
+                    str(row["Academic Year"]).strip()
                 ))
 
-            except Exception as e:
+            conn.commit()
 
-                print("Error importing student:", e)
+            cursor.execute("SELECT COUNT(*) FROM students")
+            new_count = cursor.fetchone()[0]
 
-        conn.commit()
+            print(f"Database after Excel import: {new_count} students")
 
-        print("Excel student data imported successfully.")
+        except Exception as e:
+
+            print("EXCEL IMPORT ERROR:", repr(e))
 
     else:
 
@@ -77,7 +96,7 @@ def initialize_database():
     conn.close()
 
 
-# Initialize database when application starts
+# Run database initialization
 initialize_database()
 
 
