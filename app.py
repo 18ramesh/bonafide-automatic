@@ -1,5 +1,7 @@
 from flask import Flask, render_template, request, send_file
 import sqlite3
+import os
+import pandas as pd
 
 from pdf_generator import generate_bonafide
 
@@ -7,6 +9,76 @@ from pdf_generator import generate_bonafide
 app = Flask(__name__)
 
 DB_NAME = "college.db"
+EXCEL_FILE = "students.xlsx"
+
+
+# --------------------------------------------------
+# Initialize database
+# --------------------------------------------------
+
+def initialize_database():
+
+    conn = sqlite3.connect(DB_NAME)
+
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS students (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            usn TEXT UNIQUE NOT NULL,
+            name TEXT NOT NULL,
+            course TEXT,
+            department TEXT,
+            semester TEXT,
+            academic_year TEXT
+        )
+    """)
+
+    conn.commit()
+
+    # Check whether students already exist
+    cursor.execute("SELECT COUNT(*) FROM students")
+    count = cursor.fetchone()[0]
+
+    # Import Excel data only if database is empty
+    if count == 0 and os.path.exists(EXCEL_FILE):
+
+        df = pd.read_excel(EXCEL_FILE)
+
+        for _, row in df.iterrows():
+
+            try:
+
+                cursor.execute("""
+                    INSERT OR IGNORE INTO students
+                    (usn, name, course, department, semester, academic_year)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (
+                    str(row["USN"]).strip().upper(),
+                    str(row["Name"]),
+                    str(row["Course"]),
+                    str(row["Department"]),
+                    str(row["Semester"]),
+                    str(row["Academic Year"])
+                ))
+
+            except Exception as e:
+
+                print("Error importing student:", e)
+
+        conn.commit()
+
+        print("Excel student data imported successfully.")
+
+    else:
+
+        print(f"Database already contains {count} students.")
+
+    conn.close()
+
+
+# Initialize database when application starts
+initialize_database()
 
 
 # --------------------------------------------------
@@ -143,6 +215,6 @@ if __name__ == "__main__":
 
     app.run(
         host="0.0.0.0",
-        port=5000,
-        debug=True
+        port=int(os.environ.get("PORT", 5000)),
+        debug=False
     )
