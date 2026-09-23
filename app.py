@@ -13,15 +13,15 @@ EXCEL_FILE = "students.xlsx"
 
 
 # --------------------------------------------------
-# Initialize database
+# Initialize database and import Excel data
 # --------------------------------------------------
 
 def initialize_database():
 
     conn = sqlite3.connect(DB_NAME)
-
     cursor = conn.cursor()
 
+    # Create students table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS students (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -36,39 +36,69 @@ def initialize_database():
 
     conn.commit()
 
-    # Check whether students already exist
+    # Check number of students
     cursor.execute("SELECT COUNT(*) FROM students")
     count = cursor.fetchone()[0]
 
-    # Import Excel data only if database is empty
-    if count == 0 and os.path.exists(EXCEL_FILE):
+    print(f"Database before Excel import: {count} students")
 
-        df = pd.read_excel(EXCEL_FILE)
+    # Import Excel if database is empty
+    if count == 0:
 
-        for _, row in df.iterrows():
+        # Check Excel file
+        if not os.path.exists(EXCEL_FILE):
 
-            try:
+            print("ERROR: students.xlsx NOT FOUND")
+            print("Current directory:", os.getcwd())
+
+            conn.close()
+            return
+
+        try:
+
+            print("Found students.xlsx")
+            print("Reading Excel file...")
+
+            # Read Excel
+            df = pd.read_excel(EXCEL_FILE)
+
+            print("Excel columns:", list(df.columns))
+            print("Excel rows:", len(df))
+
+            # Import every student
+            for _, row in df.iterrows():
 
                 cursor.execute("""
                     INSERT OR IGNORE INTO students
-                    (usn, name, course, department, semester, academic_year)
+                    (
+                        usn,
+                        name,
+                        course,
+                        department,
+                        semester,
+                        academic_year
+                    )
                     VALUES (?, ?, ?, ?, ?, ?)
                 """, (
                     str(row["USN"]).strip().upper(),
-                    str(row["Name"]),
-                    str(row["Course"]),
-                    str(row["Department"]),
-                    str(row["Semester"]),
-                    str(row["Academic Year"])
+                    str(row["Name"]).strip(),
+                    str(row["Course"]).strip(),
+                    str(row["Department"]).strip(),
+                    str(row["Semester"]).strip(),
+                    str(row["Academic Year"]).strip()
                 ))
 
-            except Exception as e:
+            conn.commit()
 
-                print("Error importing student:", e)
+            # Check final count
+            cursor.execute("SELECT COUNT(*) FROM students")
+            new_count = cursor.fetchone()[0]
 
-        conn.commit()
+            print(f"Database after Excel import: {new_count} students")
 
-        print("Excel student data imported successfully.")
+        except Exception as e:
+
+            print("EXCEL IMPORT ERROR:", repr(e))
 
     else:
 
@@ -94,10 +124,18 @@ def find_student_by_usn(usn):
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT usn, name, course, department, semester, academic_year
+        SELECT
+            usn,
+            name,
+            course,
+            department,
+            semester,
+            academic_year
         FROM students
         WHERE usn = ?
-    """, (usn.strip().upper(),))
+    """, (
+        usn.strip().upper(),
+    ))
 
     student = cursor.fetchone()
 
@@ -107,7 +145,7 @@ def find_student_by_usn(usn):
 
 
 # --------------------------------------------------
-# Home page - Search student
+# Home page
 # --------------------------------------------------
 
 @app.route("/", methods=["GET", "POST"])
@@ -208,7 +246,7 @@ def verify_certificate(certificate_number):
 
 
 # --------------------------------------------------
-# Run Flask
+# Run Flask application
 # --------------------------------------------------
 
 if __name__ == "__main__":
