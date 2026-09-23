@@ -21,7 +21,6 @@ def initialize_database():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
 
-    # Create students table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS students (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -36,13 +35,11 @@ def initialize_database():
 
     conn.commit()
 
-    # Check existing students
     cursor.execute("SELECT COUNT(*) FROM students")
     count = cursor.fetchone()[0]
 
     print(f"Database before Excel import: {count} students")
 
-    # Import Excel when database is empty
     if count == 0:
 
         if not os.path.exists(EXCEL_FILE):
@@ -67,7 +64,14 @@ def initialize_database():
 
                 cursor.execute("""
                     INSERT OR IGNORE INTO students
-                    (usn, name, course, department, semester, academic_year)
+                    (
+                        usn,
+                        name,
+                        course,
+                        department,
+                        semester,
+                        academic_year
+                    )
                     VALUES (?, ?, ?, ?, ?, ?)
                 """, (
                     str(row["USN"]).strip().upper(),
@@ -96,7 +100,6 @@ def initialize_database():
     conn.close()
 
 
-# Run database initialization
 initialize_database()
 
 
@@ -107,16 +110,23 @@ initialize_database()
 def find_student_by_usn(usn):
 
     conn = sqlite3.connect(DB_NAME)
-
     conn.row_factory = sqlite3.Row
 
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT usn, name, course, department, semester, academic_year
+        SELECT
+            usn,
+            name,
+            course,
+            department,
+            semester,
+            academic_year
         FROM students
         WHERE usn = ?
-    """, (usn.strip().upper(),))
+    """, (
+        usn.strip().upper(),
+    ))
 
     student = cursor.fetchone()
 
@@ -126,7 +136,7 @@ def find_student_by_usn(usn):
 
 
 # --------------------------------------------------
-# Home page - Search student
+# Home page
 # --------------------------------------------------
 
 @app.route("/", methods=["GET", "POST"])
@@ -193,9 +203,6 @@ def generate_certificate(usn):
 @app.route("/verify/<certificate_number>")
 def verify_certificate(certificate_number):
 
-    # Expected format:
-    # BON-2026-1AB23CS001
-
     parts = certificate_number.split("-")
 
     if len(parts) != 3:
@@ -227,7 +234,7 @@ def verify_certificate(certificate_number):
 
 
 # --------------------------------------------------
-# Run Flask
+# Run Flask application
 # --------------------------------------------------
 
 if __name__ == "__main__":
